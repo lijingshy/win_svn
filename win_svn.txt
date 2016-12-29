@@ -1,0 +1,134 @@
+﻿install msys2-i686-20161025.exe
+
+#install mingw-w64-install.exe 
+install i686-4.8.2-release-posix-dwarf-rt_v3-rev3
+uncompress 
+cp mingw32 to msys32 overwrite same path
+
+use mingw32 to run msys32
+pacman -Su (update system)
+pacman -S vim
+pacman -S perl
+pacman -S unzip
+pacman -S python
+
+install use tools
+
+
+prefix = /home/lijing/svn
+
+zlib128.zip
+unzip zlib128.zip
+cd zlib-1.2.8
+sed -i "s,SHARED_MODE=0,SHARED_MODE=1," win32/Makefile.gcc
+make -f win32/Makefile.gcc
+make -f win32/Makefile.gcc install DESTDIR=/home/lijing/svn INCLUDE_PATH=/include LIBRARY_PATH=/lib BINARY_PATH=/bin
+
+apr-1.5.2-win32-src.zip
+apr-0.patch
+unzip apr-1.5.2-win32-src.zip
+cd apr-1.5.2
+patch -p0 <../apr-0.patch
+./buildconf
+./configure --enable-shared=yes --disable-static --prefix=/home/lijing/svn
+make 
+make install
+
+apr-util-1.5.4-win32-src.zip
+unzip apr-util-1.5.4-win32-src.zip
+cd apr-util-1.5.4
+./buildconf --with-apr=../apr-1.5.2
+./configure --prefix=/home/lijing/svn --with-apr=/home/lijing/svn --without-iconv
+make
+make install
+
+subversion-1.9.3.tar.bz2
+sqlite-amalgamation-3071501.zip
+tar xjvf subversion-1.9.3.tar.bz2
+unzip sqlite-amalgamation-3071501.zip
+cp -rf ../sqlite-amalgamation-3071501 sqlite-amalgamation
+vi configure.ac
+delete；
+470 SVN_LIB_MACHO_ITERATE
+471 SVN_LIB_MACOS_PLIST
+472 SVN_LIB_MACOS_KEYCHAIN
+1274 PYTHON="`$abs_srcdir/build/find_python.sh`"
+
+vi subversion/libsvn_subr/config_win.c
+replace #include <Ws2tcpip.h> to #include <ws2tcpip.h>
+
+vi subversion/libsvn_subr/win32_xlate.c
+replace #include <Ws2tcpip.h> to #include <ws2tcpip.h>
+@@ -53,6 +53,8 @@
+ 
+ #include "svn_private_config.h"
+ 
++#define INITGUID 1
++DEFINE_GUID (IID_IMultiLanguage, 0x275c23e1,0x3747,0x11d0,0x9f,0xea,0x00,0xaa,0x00,0x3f,0x86,0x46);
+ static svn_atomic_t com_initialized = 0;
+ 
+ /* Initializes COM and keeps COM available until process exit.
+@@ -139,10 +139,12 @@
+       return saved; /* probably SVN_ERR_ATOMIC_INIT_FAILURE */
+     }
+ 
++#if 0
+   hr = CoCreateInstance(&CLSID_CMultiLanguage, NULL, CLSCTX_INPROC_SERVER,
+                         &IID_IMultiLanguage, (void **) &mlang);
+ 
+   if (FAILED(hr))
++#endif
+     return APR_EGENERAL;
+ 
+   /* Convert page name to wide string. */
+
+vi subversion/libsvn_subr/io.c
+@@ -1789,7 +1789,7 @@
+         }
+     }
+ 
+-    SVN_ERR(svn_utf__win32_utf8_to_utf16(&(const WCHAR*)buffer, source,
++    SVN_ERR(svn_utf__win32_utf8_to_utf16((const WCHAR**)&buffer, source,
+                                          prefix, result_pool));
+ 
+     /* Convert slashes to backslashes because the \\?\ path format
+
+vi build/generator/gen_make.py
+@@ -633,7 +633,7 @@
+         lib_required_private=[],
+         )
+       # libsvn_foo -> -lsvn_foo
+-      data.lib_deps.append('-l%s' % lib_name.replace('lib', '', 1))
++      data.lib_deps.append('-l%s-1' % lib_name.replace('lib', '', 1))
+       for lib_dep in lib_deps.split():
+         if lib_dep == 'apriconv':
+           # apriconv is part of apr-util, skip it
+		   
+vi build/generator/templates/pkg-config.in.ezt
+@@ -1,7 +1,7 @@
+ prefix=@prefix@
+ exec_prefix=@exec_prefix@
+ libdir=@libdir@
+-includedir=@includedir@
++includedir=@includedir@/subversion-1
+ 
+ ./autogen.sh
+ vi configure
+ -6530   sqlite_amalg="$abs_srcdir/sqlite-amalgamation/sqlite3.c"
+ +6530   sqlite_amalg="sqlite-amalgamation/sqlite3.c"
+ ./configure --prefix=/home/lijing/svn --with-apr=/home/lijing/svn --with-apr-util=/home/lijing/svn --with-zlib=/home/lijing/svn --enable-static=no --enable-shared=yes --disable-nls --without-serf  --without-apxs --without-gpg-agent --without-gnome-keyring --without-swig
+ vi libtool
+ -388 allow_undefined_flag="unsupported"
+ -388 allow_undefined_flag="yes"
+ vi Makefile
+-  58 LIBS =
++  58 LIBS =  -lversion -lole32
+
+make
+make install
+
+
+It is OK!
+
+
+
