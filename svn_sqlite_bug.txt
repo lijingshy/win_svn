@@ -1,0 +1,41 @@
+I can reproduce the error.
+
+It is a race condition between Stmt finalizer dedicated goroutine and the main goroutine.
+If they call sqlite3DbMallocRaw() or sqlite3DbFree() at the same time (on two OS threads), the Lookaside memory allocator gets corrupted.
+
+You can modify sqlite3.c to boost this improbable event.
+
+Line 8350:
+
+#include <assert.h>
+#include <stddef.h>
+#include <unistd.h>     <----- add this line 
+
+
+Line 19954: sqlite3DbFree(sqlite3 *db, void *p) definition
+
+pBuf->pNext = db->lookaside.pFree;
+usleep(1);                              <----- add this line 
+db->lookaside.pFree = pBuf;
+db->lookaside.nOut--;
+return;
+
+
+Line 20086: sqlite3DbMallocRaw(sqlite3 *db, int n) definition
+
+if( db->lookaside.bEnabled ){
+  if( n>db->lookaside.sz ){
+    db->lookaside.anStat[1]++;
+  }else if( (pBuf = db->lookaside.pFree)==0 ){
+    db->lookaside.anStat[2]++;
+  }else{
+    usleep(1);                               <------- add this line
+    db->lookaside.pFree = pBuf->pNext;
+    db->lookaside.nOut++;
+    db->lookaside.anStat[0]++;
+    if( db->lookaside.nOut>db->lookaside.mxOut ){
+      db->lookaside.mxOut = db->lookaside.nOut;
+    }
+    return (void*)pBuf;
+  }
+}
