@@ -1,3 +1,7 @@
+解决方案1
+Thanks for looking into this! SQLITE_THREADSAFE=1 will reduce the performance in the common case, so I think removing finalizers would be the better option. I added them just as an extra safety net, but I didn't consider the fact that they could run in parallel with other calls on the same connection object. Are there any good reasons for leaving them in?
+
+解决方案2
 I can reproduce the error.
 
 It is a race condition between Stmt finalizer dedicated goroutine and the main goroutine.
